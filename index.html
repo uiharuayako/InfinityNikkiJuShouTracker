@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>得胜已是定局</title>
+    <link rel="icon" href="./icon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; background-color: #f3f4f6; }
+        .checkbox-wrapper:hover { background-color: #eff6ff; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="max-w-4xl mx-auto p-4 sm:p-6">
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">🎮 无限暖暖巨兽养成结局记录表</h1>
+        <p class="text-gray-500 text-sm mb-4">数据保存在本地浏览器中，请勿清除缓存</p>
+        
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex justify-between items-end mb-2">
+                <span class="font-bold text-gray-700">当前进度</span>
+                <span class="text-blue-600 font-bold text-xl">{{ completedCount }} / {{ endings.length }}</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div class="bg-blue-500 h-4 rounded-full transition-all duration-500 ease-out" 
+                     :style="{ width: progressPercentage + '%' }"></div>
+            </div>
+            <div class="mt-2 text-right text-xs text-gray-500">
+                完成率: {{ progressPercentage }}%
+            </div>
+        </div>
+    </header>
+
+    <div class="mb-6 flex flex-wrap gap-2 justify-center">
+        <button 
+            @click="currentFilter = 'all'"
+            :class="['px-4 py-2 rounded-full text-sm font-medium transition-colors', 
+                     currentFilter === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200']">
+            全部显示
+        </button>
+        <button 
+            v-for="type in uniqueTypes" 
+            :key="type"
+            @click="currentFilter = type"
+            :class="['px-4 py-2 rounded-full text-sm font-medium transition-colors', 
+                     currentFilter === type ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200']">
+            {{ type }}
+        </button>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+        <div v-for="ending in filteredEndings" :key="ending.id" 
+             class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            
+            <label class="flex items-start p-4 cursor-pointer checkbox-wrapper h-full">
+                <div class="flex items-center h-6">
+                    <input type="checkbox" 
+                           :value="ending.id" 
+                           v-model="checkedIds" 
+                           @change="saveProgress"
+                           class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+                </div>
+                
+                <div class="ml-4 flex-1">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-bold text-gray-800" :class="{'line-through text-gray-400': isChecked(ending.id)}">
+                            {{ ending.name }}
+                        </h3>
+                        <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 border border-gray-200 shrink-0 ml-2">
+                            {{ ending.type }}
+                        </span>
+                    </div>
+                    
+                    <div class="mt-3 bg-gray-50 p-2 rounded border border-gray-100">
+                        <span class="font-bold text-gray-400 text-xs block mb-1">达成条件:</span>
+                        
+                        <div v-if="!ending.isStats" class="text-sm font-bold text-gray-700 leading-snug">
+                            {{ ending.condition }}
+                        </div>
+                        
+                        <div v-else class="grid grid-cols-4 gap-2 text-center mt-1">
+                            <div class="flex flex-col items-center">
+                                <span class="text-gray-400 text-xs transform scale-90 mb-0.5">力量</span>
+                                <span :class="['text-xl font-black font-mono leading-none', getGradeColor(ending.stats.str)]">{{ ending.stats.str }}</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-gray-400 text-xs transform scale-90 mb-0.5">头脑</span>
+                                <span :class="['text-xl font-black font-mono leading-none', getGradeColor(ending.stats.int)]">{{ ending.stats.int }}</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-gray-400 text-xs transform scale-90 mb-0.5">情感</span>
+                                <span :class="['text-xl font-black font-mono leading-none', getGradeColor(ending.stats.emo)]">{{ ending.stats.emo }}</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-gray-400 text-xs transform scale-90 mb-0.5">好奇</span>
+                                <span :class="['text-xl font-black font-mono leading-none', getGradeColor(ending.stats.cur)]">{{ ending.stats.cur }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <footer class="mt-12 text-center pb-8 border-t border-gray-200 pt-6">
+        <button @click="resetProgress" class="text-red-500 text-sm underline hover:text-red-700">
+            重置所有进度
+        </button>
+        <p class="text-xs text-gray-400 mt-2">Designed by Uiharu 好友码 LvKa74r</p>
+        <p class="text-xs text-gray-400 mt-2">Designed for Nikki</p>
+    </footer>
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                currentFilter: 'all',
+                checkedIds: [],
+                endings: [
+                    // 平凡结局
+                    { id: 101, type: '平凡结局', name: '平凡亦是幸福', condition: '总属性>1996, 且属性都不高于A', isStats: false },
+                    
+                    // 稚拙结局
+                    { id: 201, type: '稚拙结局', name: '时光凝固在童年', condition: '总属性<600', isStats: false },
+                    { id: 202, type: '稚拙结局', name: '那份暖暖的回忆', condition: '总属性<1997', isStats: false },
+
+                    // 普通结局
+                    { id: 301, type: '普通结局', name: '冲呀大力士', condition: '总属性>1996, 力量最高, 没有S属性', isStats: false },
+                    { id: 302, type: '普通结局', name: '成为思想家', condition: '总属性>1997, 头脑最高, 没有S属性', isStats: false },
+                    { id: 303, type: '普通结局', name: '友好大毛绒', condition: '总属性>1998, 情感最高, 没有S属性', isStats: false },
+                    { id: 304, type: '普通结局', name: '热烈探险家', condition: '总属性>1999, 好奇最高, 没有S属性', isStats: false },
+
+                    // 异才结局
+                    { id: 401, type: '异才结局', name: '强者的每日', isStats: true, stats: { str: 'S', int: 'C', emo: 'C', cur: 'C' } },
+                    { id: 402, type: '异才结局', name: '当智慧成为日常', isStats: true, stats: { str: 'C', int: 'S', emo: 'C', cur: 'C' } },
+                    { id: 403, type: '异才结局', name: '赠你一筐友好', isStats: true, stats: { str: 'C', int: 'C', emo: 'S', cur: 'C' } },
+                    { id: 404, type: '异才结局', name: '追逐向往的方向', isStats: true, stats: { str: 'C', int: 'C', emo: 'C', cur: 'S' } },
+
+                    // 卓越结局
+                    { id: 501, type: '卓越结局', name: '奔赴力量的裁决者', isStats: true, stats: { str: 'S', int: 'B', emo: 'B', cur: 'B' } },
+                    { id: 502, type: '卓越结局', name: '拨开迷雾的观察者', isStats: true, stats: { str: 'B', int: 'S', emo: 'B', cur: 'B' } },
+                    { id: 503, type: '卓越结局', name: '拥抱森林的守望者', isStats: true, stats: { str: 'B', int: 'B', emo: 'S', cur: 'B' } },
+                    { id: 504, type: '卓越结局', name: '收集风景的旅行家', isStats: true, stats: { str: 'B', int: 'B', emo: 'B', cur: 'S' } },
+
+                    // 进化结局
+                    { id: 601, type: '进化结局', name: '披荆斩棘的斗士', isStats: true, stats: { str: 'S', int: 'B', emo: 'C', cur: 'B' } },
+                    { id: 602, type: '进化结局', name: '理智缚身的贤者', isStats: true, stats: { str: 'C', int: 'S', emo: 'B', cur: 'B' } },
+                    { id: 603, type: '进化结局', name: '暖暖小窝自有天地', isStats: true, stats: { str: 'B', int: 'B', emo: 'S', cur: 'C' } },
+                    { id: 604, type: '进化结局', name: '滚烫的探索之力', isStats: true, stats: { str: 'B', int: 'C', emo: 'B', cur: 'S' } },
+
+                    // 隐秘结局
+                    { id: 701, type: '隐秘结局', name: '旅途中的生命碰撞', isStats: true, stats: { str: 'S', int: 'B', emo: 'B', cur: 'C' } },
+                    { id: 702, type: '隐秘结局', name: '方寸里的坚固铁壁', isStats: true, stats: { str: 'S', int: 'C', emo: 'B', cur: 'B' } },
+                    { id: 703, type: '隐秘结局', name: '思想的深海在何处', isStats: true, stats: { str: 'B', int: 'S', emo: 'C', cur: 'B' } },
+                    { id: 704, type: '隐秘结局', name: '锋利剑刃所向有敌', isStats: true, stats: { str: 'B', int: 'S', emo: 'B', cur: 'C' } },
+                    { id: 705, type: '隐秘结局', name: '虽然憨厚但很可爱', isStats: true, stats: { str: 'B', int: 'C', emo: 'S', cur: 'B' } },
+                    { id: 706, type: '隐秘结局', name: '像风像花也像微雨', isStats: true, stats: { str: 'C', int: 'B', emo: 'S', cur: 'B' } },
+                    { id: 707, type: '隐秘结局', name: '以勇气险胜了薄弱', isStats: true, stats: { str: 'C', int: 'B', emo: 'B', cur: 'S' } },
+                    { id: 708, type: '隐秘结局', name: '与孤独狂奔的结果', isStats: true, stats: { str: 'B', int: 'B', emo: 'C', cur: 'S' } },
+
+                    // 终极结局
+                    { id: 801, type: '终极结局', name: '智慧为刃，理性为冠', isStats: true, stats: { str: 'S', int: 'A', emo: 'C', cur: 'B' } },
+                    { id: 802, type: '终极结局', name: '开疆拓土的先驱之王', isStats: true, stats: { str: 'S', int: 'B', emo: 'C', cur: 'A' } },
+                    { id: 803, type: '终极结局', name: '柔软水泽的智慧之岛', isStats: true, stats: { str: 'C', int: 'S', emo: 'A', cur: 'B' } },
+                    { id: 804, type: '终极结局', name: '求知暗河的领航者', isStats: true, stats: { str: 'C', int: 'S', emo: 'B', cur: 'A' } },
+                    { id: 805, type: '终极结局', name: '为羁绊而生的铠甲', isStats: true, stats: { str: 'A', int: 'B', emo: 'S', cur: 'C' } },
+                    { id: 806, type: '终极结局', name: '温柔秩序的守护者', isStats: true, stats: { str: 'B', int: 'A', emo: 'S', cur: 'C' } },
+                    { id: 807, type: '终极结局', name: '天与地的主宰', isStats: true, stats: { str: 'A', int: 'C', emo: 'B', cur: 'S' } },
+                    { id: 808, type: '终极结局', name: '翱翔于烈风中', isStats: true, stats: { str: 'B', int: 'C', emo: 'A', cur: 'S' } },
+                ]
+            }
+        },
+        computed: {
+            uniqueTypes() { return [...new Set(this.endings.map(e => e.type))]; },
+            filteredEndings() {
+                if (this.currentFilter === 'all') return this.endings;
+                return this.endings.filter(e => e.type === this.currentFilter);
+            },
+            completedCount() { return this.checkedIds.length; },
+            progressPercentage() {
+                if (this.endings.length === 0) return 0;
+                return Math.round((this.checkedIds.length / this.endings.length) * 100);
+            }
+        },
+        mounted() { this.loadProgress(); },
+        methods: {
+            // 新增方法：根据等级返回颜色样式
+            getGradeColor(grade) {
+                const colors = {
+                    'S': 'text-amber-500 drop-shadow-sm', // 琥珀金 + 阴影
+                    'A': 'text-purple-600',              // 史诗紫
+                    'B': 'text-blue-500',                // 稀有蓝
+                    'C': 'text-emerald-500'              // 翡翠绿
+                };
+                return colors[grade] || 'text-gray-700';
+            },
+            isChecked(id) { return this.checkedIds.includes(id); },
+            saveProgress() { localStorage.setItem('game_ending_progress', JSON.stringify(this.checkedIds)); },
+            loadProgress() {
+                const saved = localStorage.getItem('game_ending_progress');
+                if (saved) {
+                    try { this.checkedIds = JSON.parse(saved); } catch (e) { console.error('读取存档失败', e); }
+                }
+            },
+            resetProgress() {
+                if(confirm('确定要重置所有记录吗？')) {
+                    this.checkedIds = [];
+                    this.saveProgress();
+                }
+            }
+        }
+    }).mount('#app')
+</script>
+</body>
+</html>
